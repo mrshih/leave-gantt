@@ -166,7 +166,6 @@
         <span><i class="dot" style="background:var(--c-work)"></i>穩定期上班</span>
         <span><i class="dot" style="background:var(--c-wed)"></i>婚假</span>
         <span><i class="dot" style="background:var(--c-annual)"></i>年假</span>
-        <span><i class="dot" style="background:var(--c-prenatal)"></i>產檢假(分次)</span>
         <span><span style="display:inline-block;width:2px;height:12px;background:#0891b2;margin-right:6px"></span>結婚登記日</span>
         <span><i class="dot" style="background:var(--c-tai-full)"></i>安胎假(全薪)</span>
         <span><i class="dot" style="background:var(--c-tai-unpaid)"></i>安胎假(無薪)</span>
@@ -414,14 +413,6 @@ function renderGantt(R){
     s+=`<text x="${padL-8}" y="${y+rowH/2+4}" font-size="11" fill="#374151" text-anchor="end">${seg.name}</text>`;
     s+=`<rect class="bar" data-i="${i-1}" data-work="${isWork?1:0}" x="${x1}" y="${y}" width="${w}" height="${rowH}" rx="6" fill="${seg.color}" ${isWork?'opacity="0.55"':''} style="cursor:pointer"/>`;
     if(w>46&&seg.unit) s+=`<text x="${x1+6}" y="${y+rowH/2+4}" font-size="10.5" fill="#fff" pointer-events="none">${seg.days}${seg.unit==='工作日'?'工':''}</text>`;
-    // 穩定期上班條上疊加產檢假分次標記（菱形）
-    if(isWork&&R.prenatalMarks&&R.prenatalMarks.length){
-      const cy=y+rowH/2;
-      R.prenatalMarks.forEach(md=>{
-        const mxp=x(md);
-        s+=`<rect x="${mxp-4}" y="${cy-4}" width="8" height="8" transform="rotate(45 ${mxp} ${cy})" fill="var(--c-prenatal)" stroke="#059669" stroke-width="1.2"><title>產檢假 ${fmt(md)}</title></rect>`;
-      });
-    }
     if(seg.name==='婚假'){
       s+=`<circle id="dragHandle" cx="${x1}" cy="${y+rowH/2}" r="8" fill="#fff" stroke="#2563eb" stroke-width="2.5" style="cursor:ew-resize"/>`;
     }
