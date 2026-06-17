@@ -139,12 +139,18 @@
     </div>
 
     <div class="field">
-      <label>產檢假（工作日，全薪）</label>
+      <label>結婚登記日</label>
+      <input type="date" id="registerDate">
+      <div class="hint">婚假需於登記日前 10 日起、3 個月內休完</div>
+    </div>
+
+    <div class="field">
+      <label>產檢假（天，全薪）</label>
       <input type="number" id="prenatalDays" value="7">
       <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:500;color:var(--ink)">
-        <input type="checkbox" id="prenatalInline"> 排進連續離場最前段（再提早離開）
+        <input type="checkbox" id="prenatalSpread" checked> 於穩定期內分次用掉（不影響離場）
       </label>
-      <div class="hint">不勾＝孕期內分次產檢使用</div>
+      <div class="hint">在受孕～離開前的上班期間平均分次請</div>
     </div>
   </div>
 
@@ -158,7 +164,8 @@
         <span><i class="dot" style="background:var(--c-work)"></i>穩定期上班</span>
         <span><i class="dot" style="background:var(--c-wed)"></i>婚假</span>
         <span><i class="dot" style="background:var(--c-annual)"></i>年假</span>
-        <span><i class="dot" style="background:var(--c-prenatal)"></i>產檢假</span>
+        <span><i class="dot" style="background:var(--c-prenatal)"></i>產檢假(分次)</span>
+        <span><span style="display:inline-block;width:2px;height:12px;background:#0891b2;margin-right:6px"></span>結婚登記日</span>
         <span><i class="dot" style="background:var(--c-tai-full)"></i>安胎假(全薪)</span>
         <span><i class="dot" style="background:var(--c-tai-unpaid)"></i>安胎假(無薪)</span>
         <span><i class="dot" style="background:var(--c-mat)"></i>產假</span>
@@ -268,6 +275,17 @@ function forwardWork(from,n){
   while(cnt<n){ d=addDays(d,1); if(isWorkday(d)){last=d;cnt++;} }
   return [first,last];
 }
+// 在 [start,end] 區間平均分散 n 個工作日（產檢假分次用）
+function spread(start,end,n){
+  const total=diffDays(start,end); const marks=[];
+  if(total<=0) return marks;
+  for(let i=1;i<=n;i++){
+    let d=addDays(start,Math.round(total*i/(n+1)));
+    while(!isWorkday(d)&&d<end) d=addDays(d,1);
+    marks.push(d);
+  }
+  return marks;
+}
 
 /* ---------- 計算（正向接力：穩定期 → 婚 → 年 → 安胎 → 產 → 育嬰）---------- */
 function compute(){
@@ -280,32 +298,30 @@ function compute(){
   const annualDays=+$('annualDays').value;
   const weddingDays=+$('weddingDays').value;
   const prenatalDays=+$('prenatalDays').value;
-  const prenatalInline=$('prenatalInline').checked;
+  const prenatalSpread=$('prenatalSpread').checked;
+  const registerDate=$('registerDate').value?parseD($('registerDate').value):null;
 
   const segs=[];
   const mlEnd=addDays(mlStart,mlDays-1);
   const plStart=addDays(mlEnd,1);
   const plEnd=addDays(addMonths(plStart,plMonths),-1);
 
-  // 正向排列
-  let cursor=chainStart, preStart=null,preEnd=null;
-  if(prenatalInline&&prenatalDays>0){
-    [preStart,preEnd]=forwardWork(cursor,prenatalDays);
-    cursor=addDays(preEnd,1);
-  }
-  const [wedStart,wedEnd]=forwardWork(cursor,weddingDays);
+  // 正向排列（產檢假改為穩定期內分次，不佔連續鏈）
+  const [wedStart,wedEnd]=forwardWork(chainStart,weddingDays);
   const [annStart,annEnd]=forwardWork(addDays(wedEnd,1),annualDays);
   const taiStart=addDays(annEnd,1);          // 安胎假日曆接續年假
   const taiEnd=addDays(mlStart,-1);
   const taiTotal=diffDays(taiStart,taiEnd)+1;
 
-  const firstSeg=preStart||wedStart;
+  const firstSeg=wedStart;
   const lastWorkDay=prevWorkday(firstSeg);
+
+  // 產檢假：穩定期內平均分次
+  const prenatalMarks=(prenatalSpread&&prenatalDays>0)?spread(conception,lastWorkDay,prenatalDays):[];
 
   let warn=null;
   if(taiTotal<0) warn='「請假鏈開始日」太晚：婚假＋年假已排到產假之後。請提早開始日或減少天數。';
 
-  if(preStart) segs.push({name:'產檢假',s:preStart,e:preEnd,days:prenatalDays,unit:'工作日',pay:'full',color:'var(--c-prenatal)'});
   segs.push({name:'婚假',s:wedStart,e:wedEnd,days:weddingDays,unit:'工作日',pay:'full',color:'var(--c-wed)'});
   segs.push({name:'年假/特休',s:annStart,e:annEnd,days:annualDays,unit:'工作日',pay:'full',color:'var(--c-annual)'});
   if(taiTotal>0){
@@ -320,12 +336,13 @@ function compute(){
   // 穩定期上班區段（受孕 ~ 離開前一天）僅供甘特顯示
   const workSeg={name:'穩定期上班',s:conception,e:lastWorkDay,days:diffDays(conception,lastWorkDay)+1,color:'var(--c-work)'};
 
-  return {segs,workSeg,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal,warn,chainStart};
+  return {segs,workSeg,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal,warn,chainStart,
+          prenatalMarks,prenatalDays,prenatalSpread,registerDate};
 }
 
 /* ---------- 摘要 ---------- */
 function renderStats(R){
-  const fullDays=R.segs.filter(s=>s.pay==='full').reduce((a,s)=>a+s.days,0);
+  const fullDays=R.segs.filter(s=>s.pay==='full').reduce((a,s)=>a+s.days,0)+(R.prenatalSpread?R.prenatalDays:0);
   const unpaid=R.segs.filter(s=>s.pay==='unpaid').reduce((a,s)=>a+s.days,0);
   const total=diffDays(R.firstSeg,R.plEnd)+1;
   const stabM=(diffDays(R.conception,R.firstSeg)/30.4).toFixed(1);
@@ -376,6 +393,7 @@ function renderGantt(R){
             <text x="${vx+3}" y="${H-6}" font-size="10" fill="${col}">${label}</text>`;
   }
   s+=vline(R.edd,'預產期 '+fmtTW(R.edd),'#ec4899');
+  if(R.registerDate) s+=vline(R.registerDate,'結婚登記 '+fmtTW(R.registerDate),'#0891b2');
   allSegs.forEach((seg,i)=>{
     const y=padT+i*(rowH+gap);
     const x1=x(seg.s),x2=x(addDays(seg.e,1));
@@ -384,7 +402,15 @@ function renderGantt(R){
     s+=`<text x="${padL-8}" y="${y+rowH/2+4}" font-size="11" fill="#374151" text-anchor="end">${seg.name}</text>`;
     s+=`<rect class="bar" data-i="${i-1}" data-work="${isWork?1:0}" x="${x1}" y="${y}" width="${w}" height="${rowH}" rx="6" fill="${seg.color}" ${isWork?'opacity="0.55"':''} style="cursor:pointer"/>`;
     if(w>46&&seg.unit) s+=`<text x="${x1+6}" y="${y+rowH/2+4}" font-size="10.5" fill="#fff" pointer-events="none">${seg.days}${seg.unit==='工作日'?'工':''}</text>`;
-    if(seg.name==='婚假'||(isWork&&false)){
+    // 穩定期上班條上疊加產檢假分次標記（菱形）
+    if(isWork&&R.prenatalMarks&&R.prenatalMarks.length){
+      const cy=y+rowH/2;
+      R.prenatalMarks.forEach(md=>{
+        const mxp=x(md);
+        s+=`<rect x="${mxp-4}" y="${cy-4}" width="8" height="8" transform="rotate(45 ${mxp} ${cy})" fill="var(--c-prenatal)" stroke="#059669" stroke-width="1.2"><title>產檢假 ${fmt(md)}</title></rect>`;
+      });
+    }
+    if(seg.name==='婚假'){
       s+=`<circle id="dragHandle" cx="${x1}" cy="${y+rowH/2}" r="8" fill="#fff" stroke="#2563eb" stroke-width="2.5" style="cursor:ew-resize"/>`;
     }
   });
@@ -443,6 +469,7 @@ function setChainFromStability(){
   const c=parseD($('conception').value);
   const m=+$('stabilityMonths').value;
   $('chainStart').value=fmt(addMonths(c,m));
+  $('registerDate').value=$('chainStart').value;  // 登記日預設＝請假鏈開始日
 }
 function syncChain(){
   const cMin=parseD($('conception').value);
@@ -471,9 +498,9 @@ function init(){
   $('conception').addEventListener('change',()=>{autoEDD();autoMLStart();setChainFromStability();refresh();});
   $('edd').addEventListener('change',()=>{autoMLStart();refresh();});
   $('stabilityMonths').addEventListener('change',()=>{setChainFromStability();refresh();});
-  ['mlStart','mlDays','plMonths','chainStart','annualDays','weddingDays','prenatalDays'].forEach(id=>
+  ['mlStart','mlDays','plMonths','chainStart','annualDays','weddingDays','prenatalDays','registerDate'].forEach(id=>
     $(id).addEventListener('change',()=>refresh()));
-  $('prenatalInline').addEventListener('change',()=>refresh());
+  $('prenatalSpread').addEventListener('change',()=>refresh());
   $('chainRange').addEventListener('input',()=>{
     $('chainStart').value=fmt(addDays(parseD($('conception').value),+$('chainRange').value));
     refresh(true);
