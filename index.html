@@ -8,6 +8,7 @@
   :root{
     --bg:#f4f6fb; --card:#ffffff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
     --accent:#6366f1;
+    --c-work:#fcd34d;
     --c-wed:#34d399; --c-annual:#10b981; --c-prenatal:#a7f3d0;
     --c-tai-full:#60a5fa; --c-tai-unpaid:#cbd5e1;
     --c-mat:#a78bfa; --c-parental:#fb923c;
@@ -37,18 +38,15 @@
   button:hover{background:#e0e7ff}
   button.solid{background:var(--accent);color:#fff}
   button.solid:hover{background:#4f46e5}
-  /* summary cards */
   .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px}
   .stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px}
   .stat .k{font-size:11px;color:var(--muted);font-weight:600}
   .stat .v{font-size:18px;font-weight:700;margin-top:2px}
   .stat .s{font-size:11px;color:var(--muted)}
-  /* gantt */
   #ganttWrap{position:relative;overflow-x:auto}
   svg{display:block;width:100%;height:auto;user-select:none}
   .tip{position:fixed;pointer-events:none;background:#111827;color:#fff;padding:8px 11px;border-radius:8px;
        font-size:12px;opacity:0;transition:opacity .1s;z-index:50;max-width:240px;box-shadow:0 4px 14px rgba(0,0,0,.25)}
-  /* table */
   table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
   th{color:var(--muted);font-size:11.5px;font-weight:700}
@@ -56,6 +54,8 @@
   .pay-full{color:#059669;font-weight:600}
   .pay-unpaid{color:#9ca3af}
   .pay-subsidy{color:#ea580c;font-weight:600}
+  .warn{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:9px 12px;border-radius:8px;
+        font-size:12.5px;margin-bottom:10px}
   details{margin-top:14px}
   summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--accent)}
   textarea{width:100%;height:160px;margin-top:8px;border:1px solid var(--line);border-radius:8px;
@@ -68,7 +68,7 @@
 <body>
 <header>
   <h1>🤰 懷孕 → 育嬰留停 · 請假規劃器</h1>
-  <p>依公司請假辦法與年度行事曆 · 接力順序：婚假 → 年假 → 安胎假 → 產假 → 育嬰留停 · 目標：越早離開職場</p>
+  <p>受孕後先正常上班，滿穩定期再登記、開始請假 · 接力順序：婚假 → 年假 → 安胎假 → 產假 → 育嬰留停</p>
 </header>
 
 <div class="wrap">
@@ -111,13 +111,18 @@
     <hr style="border:none;border-top:1px solid var(--line);margin:6px 0 14px">
 
     <div class="field">
-      <label>安胎假開始日 ⟵ 拖這個決定「多早離開」</label>
-      <input type="date" id="taitaiStart">
-      <input type="range" id="taitaiRange" style="margin-top:8px">
-      <div class="hint" id="taitaiHint"></div>
+      <label>穩定期（月）— 滿幾個月再登記 / 開始請假</label>
+      <input type="number" id="stabilityMonths" value="3" min="0" step="0.5">
+      <div class="hint">前 3 個月不穩定，先正常上班，不登記、不請假</div>
+    </div>
+
+    <div class="field">
+      <label>請假鏈開始日 ⟵ 拖這個調整「何時開始不上班」</label>
+      <input type="date" id="chainStart">
+      <input type="range" id="chainRange" style="margin-top:8px">
+      <div class="hint" id="chainHint"></div>
       <div class="btns">
-        <button id="btnMax">⏩ 最大化離場（安胎拉到最早）</button>
-        <button id="btnDefault">↺ 回第 7 個月</button>
+        <button id="btnDefault">↺ 回穩定期預設</button>
       </div>
     </div>
 
@@ -150,6 +155,7 @@
     <div class="card" style="margin-bottom:18px">
       <h2>📊 請假甘特圖</h2>
       <div class="legend">
+        <span><i class="dot" style="background:var(--c-work)"></i>穩定期上班</span>
         <span><i class="dot" style="background:var(--c-wed)"></i>婚假</span>
         <span><i class="dot" style="background:var(--c-annual)"></i>年假</span>
         <span><i class="dot" style="background:var(--c-prenatal)"></i>產檢假</span>
@@ -159,11 +165,12 @@
         <span><i class="dot" style="background:var(--c-parental)"></i>育嬰留停</span>
       </div>
       <div id="ganttWrap"><svg id="gantt"></svg></div>
-      <div class="note">💡 在甘特圖上拖動「安胎假」左端的圓點，可即時改變開始時間並重算整條時程。滑鼠移到色塊看明細。</div>
+      <div class="note">💡 拖動「請假鏈起點」的圓點，即時調整何時開始不上班並重算整條時程。滑鼠移到色塊看明細。</div>
     </div>
 
     <div class="card">
       <h2>📋 時程明細</h2>
+      <div id="warnBox"></div>
       <table id="detail"></table>
 
       <details>
@@ -173,7 +180,7 @@
         <div class="btns"><button class="solid" id="applyHol">套用假日重算</button></div>
       </details>
 
-      <p class="note">⚠️ 本表為依公司辦法＋行事曆之試算，非個案法律意見；實際請以人資與主管核定為準。安胎假第 31 天起為無薪（已假設醫師願開立診斷證明、無薪天數不計較）。育嬰留停前 6 個月可領就業保險育嬰津貼（投保薪資 80%）。</p>
+      <p class="note">⚠️ 本表為依公司辦法＋行事曆之試算，非個案法律意見；實際請以人資與主管核定為準。受孕後至「請假鏈開始日」為正常上班（穩定期）。安胎假第 31 天起為無薪（已假設醫師願開立診斷證明、無薪天數不計較）。育嬰留停前 6 個月可領就業保險育嬰津貼（投保薪資 80%）。</p>
     </div>
   </div>
 </div>
@@ -254,72 +261,77 @@ function loadHol(){
 }
 function isWorkday(d){return d.getDay()!==0&&d.getDay()!==6&&!HOLSET.has(fmt(d));}
 function prevWorkday(d){let x=addDays(d,-1);while(!isWorkday(x))x=addDays(x,-1);return x;}
-// 從 anchor(不含) 往前數 n 個工作日，回傳 [首日, 末日]
-function backWork(anchor,n){
-  let d=anchor,first=null,last=null;
-  for(let i=0;i<n;i++){d=prevWorkday(d);if(i===0)last=d;first=d;}
-  return n>0?[first,last]:[null,null];
+// 從 from(含) 起、第一個工作日為首日，連續數 n 個工作日，回傳 [首日, 末日]
+function forwardWork(from,n){
+  let d=from; while(!isWorkday(d)) d=addDays(d,1);
+  let first=d,last=d,cnt=1;
+  while(cnt<n){ d=addDays(d,1); if(isWorkday(d)){last=d;cnt++;} }
+  return [first,last];
 }
 
-/* ---------- 計算 ---------- */
+/* ---------- 計算（正向接力：穩定期 → 婚 → 年 → 安胎 → 產 → 育嬰）---------- */
 function compute(){
   const conception=parseD($('conception').value);
   const edd=parseD($('edd').value);
   const mlStart=parseD($('mlStart').value);
   const mlDays=+$('mlDays').value;
   const plMonths=+$('plMonths').value;
-  const taitaiStart=parseD($('taitaiStart').value);
+  const chainStart=parseD($('chainStart').value);
   const annualDays=+$('annualDays').value;
   const weddingDays=+$('weddingDays').value;
   const prenatalDays=+$('prenatalDays').value;
   const prenatalInline=$('prenatalInline').checked;
 
   const segs=[];
-  // 產假
   const mlEnd=addDays(mlStart,mlDays-1);
-  // 育嬰留停
   const plStart=addDays(mlEnd,1);
   const plEnd=addDays(addMonths(plStart,plMonths),-1);
-  // 安胎假 = taitaiStart ~ 產假前一天
-  const taiEnd=addDays(mlStart,-1);
-  const taiTotal=diffDays(taitaiStart,taiEnd)+1;
-  // 年假(緊接安胎假前)
-  const [annStart,annEnd]=backWork(taitaiStart,annualDays);
-  // 婚假(緊接年假前)
-  const [wedStart,wedEnd]=backWork(annStart,weddingDays);
-  // 產檢假(可選，最前)
-  let preStart=null,preEnd=null,firstSeg=wedStart;
+
+  // 正向排列
+  let cursor=chainStart, preStart=null,preEnd=null;
   if(prenatalInline&&prenatalDays>0){
-    [preStart,preEnd]=backWork(wedStart,prenatalDays);
-    firstSeg=preStart;
+    [preStart,preEnd]=forwardWork(cursor,prenatalDays);
+    cursor=addDays(preEnd,1);
   }
+  const [wedStart,wedEnd]=forwardWork(cursor,weddingDays);
+  const [annStart,annEnd]=forwardWork(addDays(wedEnd,1),annualDays);
+  const taiStart=addDays(annEnd,1);          // 安胎假日曆接續年假
+  const taiEnd=addDays(mlStart,-1);
+  const taiTotal=diffDays(taiStart,taiEnd)+1;
+
+  const firstSeg=preStart||wedStart;
   const lastWorkDay=prevWorkday(firstSeg);
+
+  let warn=null;
+  if(taiTotal<0) warn='「請假鏈開始日」太晚：婚假＋年假已排到產假之後。請提早開始日或減少天數。';
 
   if(preStart) segs.push({name:'產檢假',s:preStart,e:preEnd,days:prenatalDays,unit:'工作日',pay:'full',color:'var(--c-prenatal)'});
   segs.push({name:'婚假',s:wedStart,e:wedEnd,days:weddingDays,unit:'工作日',pay:'full',color:'var(--c-wed)'});
   segs.push({name:'年假/特休',s:annStart,e:annEnd,days:annualDays,unit:'工作日',pay:'full',color:'var(--c-annual)'});
-  // 安胎假拆全薪/無薪
   if(taiTotal>0){
-    const fullEnd=addDays(taitaiStart,Math.min(30,taiTotal)-1);
-    segs.push({name:'安胎假(全薪)',s:taitaiStart,e:fullEnd,days:Math.min(30,taiTotal),unit:'日',pay:'full',color:'var(--c-tai-full)'});
-    if(taiTotal>30){
+    const fullEnd=addDays(taiStart,Math.min(30,taiTotal)-1);
+    segs.push({name:'安胎假(全薪)',s:taiStart,e:fullEnd,days:Math.min(30,taiTotal),unit:'日',pay:'full',color:'var(--c-tai-full)'});
+    if(taiTotal>30)
       segs.push({name:'安胎假(無薪)',s:addDays(fullEnd,1),e:taiEnd,days:taiTotal-30,unit:'日',pay:'unpaid',color:'var(--c-tai-unpaid)'});
-    }
   }
   segs.push({name:'產假',s:mlStart,e:mlEnd,days:mlDays,unit:'日',pay:'full',color:'var(--c-mat)'});
   segs.push({name:'育嬰留停',s:plStart,e:plEnd,days:diffDays(plStart,plEnd)+1,unit:'日',pay:'subsidy',color:'var(--c-parental)'});
 
-  return {segs,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal};
+  // 穩定期上班區段（受孕 ~ 離開前一天）僅供甘特顯示
+  const workSeg={name:'穩定期上班',s:conception,e:lastWorkDay,days:diffDays(conception,lastWorkDay)+1,color:'var(--c-work)'};
+
+  return {segs,workSeg,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal,warn,chainStart};
 }
 
-/* ---------- 渲染摘要 ---------- */
+/* ---------- 摘要 ---------- */
 function renderStats(R){
   const fullDays=R.segs.filter(s=>s.pay==='full').reduce((a,s)=>a+s.days,0);
   const unpaid=R.segs.filter(s=>s.pay==='unpaid').reduce((a,s)=>a+s.days,0);
   const total=diffDays(R.firstSeg,R.plEnd)+1;
+  const stabM=(diffDays(R.conception,R.firstSeg)/30.4).toFixed(1);
   $('stats').innerHTML=`
     <div class="stat"><div class="k">最後上班日</div><div class="v">${fmtTW(R.lastWorkDay)}</div><div class="s">${R.lastWorkDay.getFullYear()} (週${WK[R.lastWorkDay.getDay()]})</div></div>
-    <div class="stat"><div class="k">離開職場第一天</div><div class="v">${fmtTW(R.firstSeg)}</div><div class="s">${R.firstSeg.getFullYear()}</div></div>
+    <div class="stat"><div class="k">離開職場第一天</div><div class="v">${fmtTW(R.firstSeg)}</div><div class="s">受孕後約 ${stabM} 個月</div></div>
     <div class="stat"><div class="k">預產期</div><div class="v">${fmtTW(R.edd)}</div><div class="s">${R.edd.getFullYear()}</div></div>
     <div class="stat"><div class="k">復職日</div><div class="v">${fmtTW(R.reInstate)}</div><div class="s">${R.reInstate.getFullYear()}</div></div>
     <div class="stat"><div class="k">連續離場總長</div><div class="v">${total}<span style="font-size:12px"> 天</span></div><div class="s">約 ${(total/30.4).toFixed(1)} 個月</div></div>
@@ -327,8 +339,9 @@ function renderStats(R){
 }
 function payText(p){return p==='full'?'<span class="pay-full">全薪</span>':p==='unpaid'?'<span class="pay-unpaid">無薪</span>':'<span class="pay-subsidy">就保80%(前6月)</span>';}
 function renderTable(R){
+  $('warnBox').innerHTML=R.warn?`<div class="warn">⚠️ ${R.warn}</div>`:'';
   let h='<tr><th>假別</th><th>起</th><th>訖</th><th>天數</th><th>薪資</th></tr>';
-  h+=`<tr><td colspan="5" style="color:var(--muted)">— 最後上班日：<b>${fmt(R.lastWorkDay)}（週${WK[R.lastWorkDay.getDay()]}）</b> —</td></tr>`;
+  h+=`<tr><td colspan="5" style="color:var(--muted)">— 受孕 ${fmt(R.conception)} → 穩定期正常上班至 <b>${fmt(R.lastWorkDay)}（週${WK[R.lastWorkDay.getDay()]}）</b> —</td></tr>`;
   R.segs.forEach(s=>{
     h+=`<tr><td><span class="dot" style="background:${s.color}"></span>${s.name}</td>
         <td>${fmt(s.s)}</td><td>${fmt(s.e)}</td><td>${s.days} ${s.unit}</td><td>${payText(s.pay)}</td></tr>`;
@@ -337,19 +350,16 @@ function renderTable(R){
   $('detail').innerHTML=h;
 }
 
-/* ---------- 渲染甘特 ---------- */
-let curR=null;
+/* ---------- 甘特 ---------- */
 function renderGantt(R){
-  curR=R;
-  const svg=$('gantt');
-  const W=1000,padL=110,padR=30,padT=46,rowH=30,gap=8;
-  const rows=R.segs.length;
+  const W=1000,padL=110,padR=30,padT=46,rowH=28,gap=7;
+  const allSegs=[R.workSeg,...R.segs];
+  const rows=allSegs.length;
   const H=padT+rows*(rowH+gap)+30;
-  const t0=R.firstSeg, t1=R.plEnd;
+  const t0=R.conception, t1=R.plEnd;
   const span=diffDays(t0,t1)||1;
   const x=d=>padL+(diffDays(t0,d)/span)*(W-padL-padR);
   let s=`<svg id="gantt" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
-  // 月份格線
   let m=new Date(t0.getFullYear(),t0.getMonth(),1);
   while(m<=t1){
     const mx=x(m);
@@ -359,7 +369,6 @@ function renderGantt(R){
     }
     m=addMonths(m,1);
   }
-  // 參考線：最後上班 / 預產期 / 復職
   function vline(d,label,col){
     if(d<t0||d>addDays(t1,2))return '';
     const vx=x(d<t0?t0:d);
@@ -367,37 +376,36 @@ function renderGantt(R){
             <text x="${vx+3}" y="${H-6}" font-size="10" fill="${col}">${label}</text>`;
   }
   s+=vline(R.edd,'預產期 '+fmtTW(R.edd),'#ec4899');
-  // bars
-  R.segs.forEach((seg,i)=>{
+  allSegs.forEach((seg,i)=>{
     const y=padT+i*(rowH+gap);
     const x1=x(seg.s),x2=x(addDays(seg.e,1));
     const w=Math.max(2,x2-x1);
-    s+=`<text x="${padL-8}" y="${y+rowH/2+4}" font-size="11.5" fill="#374151" text-anchor="end">${seg.name}</text>`;
-    s+=`<rect class="bar" data-i="${i}" x="${x1}" y="${y}" width="${w}" height="${rowH}" rx="6" fill="${seg.color}" style="cursor:pointer"/>`;
-    if(w>46) s+=`<text x="${x1+6}" y="${y+rowH/2+4}" font-size="10.5" fill="#fff" pointer-events="none">${seg.days}${seg.unit==='工作日'?'工':''}</text>`;
-    // 安胎假全薪段 → 拖拉把手
-    if(seg.name.startsWith('安胎假(全薪)')){
+    const isWork=seg.name==='穩定期上班';
+    s+=`<text x="${padL-8}" y="${y+rowH/2+4}" font-size="11" fill="#374151" text-anchor="end">${seg.name}</text>`;
+    s+=`<rect class="bar" data-i="${i-1}" data-work="${isWork?1:0}" x="${x1}" y="${y}" width="${w}" height="${rowH}" rx="6" fill="${seg.color}" ${isWork?'opacity="0.55"':''} style="cursor:pointer"/>`;
+    if(w>46&&seg.unit) s+=`<text x="${x1+6}" y="${y+rowH/2+4}" font-size="10.5" fill="#fff" pointer-events="none">${seg.days}${seg.unit==='工作日'?'工':''}</text>`;
+    if(seg.name==='婚假'||(isWork&&false)){
       s+=`<circle id="dragHandle" cx="${x1}" cy="${y+rowH/2}" r="8" fill="#fff" stroke="#2563eb" stroke-width="2.5" style="cursor:ew-resize"/>`;
     }
   });
   s+='</svg>';
-  svg.outerHTML=s;
-  bindGantt(R,t0,t1,padL,padR,W,x);
+  $('gantt').outerHTML=s;
+  bindGantt(R,t0,t1,padL,padR,W,allSegs);
 }
 
-function bindGantt(R,t0,t1,padL,padR,W,x){
+function bindGantt(R,t0,t1,padL,padR,W,allSegs){
   const svg=$('gantt');
-  // tooltip
   svg.querySelectorAll('.bar').forEach(b=>{
     b.addEventListener('mousemove',e=>{
-      const seg=R.segs[+b.dataset.i];
+      const work=b.dataset.work==='1';
+      const seg=work?R.workSeg:R.segs[+b.dataset.i];
       const tip=$('tip');
-      tip.innerHTML=`<b>${seg.name}</b><br>${fmt(seg.s)} ~ ${fmt(seg.e)}<br>${seg.days} ${seg.unit} · ${seg.pay==='full'?'全薪':seg.pay==='unpaid'?'無薪':'就保80%'}`;
+      const payTxt=work?'正常上班':(seg.pay==='full'?'全薪':seg.pay==='unpaid'?'無薪':'就保80%');
+      tip.innerHTML=`<b>${seg.name}</b><br>${fmt(seg.s)} ~ ${fmt(seg.e)}<br>${seg.days} ${seg.unit||'日'} · ${payTxt}`;
       tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.style.opacity=1;
     });
     b.addEventListener('mouseleave',()=>$('tip').style.opacity=0);
   });
-  // drag handle → 改 taitaiStart
   const h=$('dragHandle');
   if(h){
     let dragging=false;
@@ -406,10 +414,8 @@ function bindGantt(R,t0,t1,padL,padR,W,x){
       const r=svg.getBoundingClientRect();
       const px=(clientX-r.left)/r.width*W;
       const frac=(px-padL)/(W-padL-padR);
-      let dd=Math.round(frac*span);
-      return addDays(t0,dd);
+      return addDays(t0,Math.round(frac*span));
     }
-    const start=()=>dragging=true;
     const move=e=>{
       if(!dragging)return;
       const cx=e.touches?e.touches[0].clientX:e.clientX;
@@ -417,43 +423,41 @@ function bindGantt(R,t0,t1,padL,padR,W,x){
       const cMin=parseD($('conception').value);
       const cMax=addDays(parseD($('mlStart').value),-1);
       if(nd<cMin)nd=cMin; if(nd>cMax)nd=cMax;
-      $('taitaiStart').value=fmt(nd);
-      syncTaitaiRange();
+      $('chainStart').value=fmt(nd);
+      syncChain();
       refresh(true);
     };
-    const end=()=>dragging=false;
-    h.addEventListener('mousedown',start);
+    h.addEventListener('mousedown',()=>dragging=true);
     window.addEventListener('mousemove',move);
-    window.addEventListener('mouseup',end);
-    h.addEventListener('touchstart',start,{passive:true});
+    window.addEventListener('mouseup',()=>dragging=false);
+    h.addEventListener('touchstart',()=>dragging=true,{passive:true});
     window.addEventListener('touchmove',move,{passive:true});
-    window.addEventListener('touchend',end);
+    window.addEventListener('touchend',()=>dragging=false);
   }
 }
 
-/* ---------- 同步與重算 ---------- */
-function autoEDD(){
+/* ---------- 同步 ---------- */
+function autoEDD(){$('edd').value=fmt(addDays(parseD($('conception').value),266));}
+function autoMLStart(){$('mlStart').value=fmt(addMonths(parseD($('edd').value),-1));}
+function setChainFromStability(){
   const c=parseD($('conception').value);
-  $('edd').value=fmt(addDays(c,266));
+  const m=+$('stabilityMonths').value;
+  $('chainStart').value=fmt(addMonths(c,m));
 }
-function autoMLStart(){
-  const e=parseD($('edd').value);
-  $('mlStart').value=fmt(addMonths(e,-1));
-}
-function syncTaitaiRange(){
+function syncChain(){
   const cMin=parseD($('conception').value);
   const cMax=addDays(parseD($('mlStart').value),-1);
-  const r=$('taitaiRange');
+  const r=$('chainRange');
   r.min=0;r.max=Math.max(1,diffDays(cMin,cMax));
-  const cur=parseD($('taitaiStart').value);
+  const cur=parseD($('chainStart').value);
   r.value=Math.min(r.max,Math.max(0,diffDays(cMin,cur)));
-  const dd=parseD($('taitaiStart').value);
-  $('taitaiHint').textContent=`安胎假 ${fmt(dd)}（週${WK[dd.getDay()]}）起 · 受孕後第 ${Math.round(diffDays(cMin,dd)/30.4*10)/10} 個月左右`;
+  const mo=Math.round(diffDays(cMin,cur)/30.4*10)/10;
+  $('chainHint').textContent=`開始請假 ${fmt(cur)}（週${WK[cur.getDay()]}）· 受孕後約 ${mo} 個月`;
   $('eddHint').textContent='受孕日：'+$('conception').value;
 }
-function refresh(skipRangeSync){
+function refresh(skipSync){
   loadHol();
-  if(!skipRangeSync)syncTaitaiRange();
+  if(!skipSync)syncChain();
   const R=compute();
   renderStats(R);renderTable(R);renderGantt(R);
 }
@@ -461,26 +465,20 @@ function refresh(skipRangeSync){
 /* ---------- 事件 ---------- */
 function init(){
   $('holidays').value=DEFAULT_HOL;
-  autoEDD();autoMLStart();
-  // 安胎假預設 = 受孕後6個月(第7個月)
-  $('taitaiStart').value=fmt(addMonths(parseD($('conception').value),6));
+  autoEDD();autoMLStart();setChainFromStability();
   refresh();
 
-  $('conception').addEventListener('change',()=>{autoEDD();autoMLStart();
-    $('taitaiStart').value=fmt(addMonths(parseD($('conception').value),6));refresh();});
+  $('conception').addEventListener('change',()=>{autoEDD();autoMLStart();setChainFromStability();refresh();});
   $('edd').addEventListener('change',()=>{autoMLStart();refresh();});
-  ['mlStart','mlDays','plMonths','taitaiStart','annualDays','weddingDays','prenatalDays'].forEach(id=>
+  $('stabilityMonths').addEventListener('change',()=>{setChainFromStability();refresh();});
+  ['mlStart','mlDays','plMonths','chainStart','annualDays','weddingDays','prenatalDays'].forEach(id=>
     $(id).addEventListener('change',()=>refresh()));
   $('prenatalInline').addEventListener('change',()=>refresh());
-  $('taitaiRange').addEventListener('input',()=>{
-    const cMin=parseD($('conception').value);
-    $('taitaiStart').value=fmt(addDays(cMin,+$('taitaiRange').value));
+  $('chainRange').addEventListener('input',()=>{
+    $('chainStart').value=fmt(addDays(parseD($('conception').value),+$('chainRange').value));
     refresh(true);
   });
-  $('btnMax').addEventListener('click',()=>{
-    $('taitaiStart').value=$('conception').value;refresh();});
-  $('btnDefault').addEventListener('click',()=>{
-    $('taitaiStart').value=fmt(addMonths(parseD($('conception').value),6));refresh();});
+  $('btnDefault').addEventListener('click',()=>{setChainFromStability();refresh();});
   $('applyHol').addEventListener('click',()=>refresh());
 }
 init();
