@@ -56,6 +56,8 @@
   .pay-subsidy{color:#ea580c;font-weight:600}
   .warn{background:#fef2f2;border:1px solid #fecaca;color:#b91c1c;padding:9px 12px;border-radius:8px;
         font-size:12.5px;margin-bottom:10px}
+  .ok{background:#f0fdf4;border:1px solid #bbf7d0;color:#15803d;padding:9px 12px;border-radius:8px;
+      font-size:12.5px;margin-bottom:10px}
   details{margin-top:14px}
   summary{cursor:pointer;font-weight:600;font-size:13px;color:var(--accent)}
   textarea{width:100%;height:160px;margin-top:8px;border:1px solid var(--line);border-radius:8px;
@@ -319,8 +321,16 @@ function compute(){
   // 產檢假：穩定期內平均分次
   const prenatalMarks=(prenatalSpread&&prenatalDays>0)?spread(conception,lastWorkDay,prenatalDays):[];
 
-  let warn=null;
-  if(taiTotal<0) warn='「請假鏈開始日」太晚：婚假＋年假已排到產假之後。請提早開始日或減少天數。';
+  const warns=[];
+  if(taiTotal<0) warns.push('「請假鏈開始日」太晚：婚假＋年假已排到產假之後。請提早開始日或減少天數。');
+  // 婚假合規：須於登記日前10日起、3個月內休完（逾期需主管同意延至1年）
+  let wedCompliant=false, wedOK=null;
+  if(registerDate){
+    const lo=addDays(registerDate,-10), hi=addMonths(registerDate,3);
+    if(wedStart<lo) warns.push(`婚假開始 ${fmt(wedStart)} 早於「登記日前 10 日」(${fmt(lo)})，不符規定。請提前登記或延後婚假。`);
+    else if(wedEnd>hi) warns.push(`婚假結束 ${fmt(wedEnd)} 超過「登記日後 3 個月」(${fmt(hi)})，須經主管同意才能延至 1 年內請畢。`);
+    else { wedCompliant=true; wedOK=`婚假 ${fmt(wedStart)}~${fmt(wedEnd)} 落在「登記日前 10 日 (${fmt(lo)}) ~ 後 3 個月 (${fmt(hi)})」內，符合規定。`; }
+  }
 
   segs.push({name:'婚假',s:wedStart,e:wedEnd,days:weddingDays,unit:'工作日',pay:'full',color:'var(--c-wed)'});
   segs.push({name:'年假/特休',s:annStart,e:annEnd,days:annualDays,unit:'工作日',pay:'full',color:'var(--c-annual)'});
@@ -336,8 +346,8 @@ function compute(){
   // 穩定期上班區段（受孕 ~ 離開前一天）僅供甘特顯示
   const workSeg={name:'穩定期上班',s:conception,e:lastWorkDay,days:diffDays(conception,lastWorkDay)+1,color:'var(--c-work)'};
 
-  return {segs,workSeg,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal,warn,chainStart,
-          prenatalMarks,prenatalDays,prenatalSpread,registerDate};
+  return {segs,workSeg,lastWorkDay,reInstate:addDays(plEnd,1),edd,conception,plEnd,firstSeg,taiTotal,warns,chainStart,
+          prenatalMarks,prenatalDays,prenatalSpread,registerDate,wedCompliant,wedOK};
 }
 
 /* ---------- 摘要 ---------- */
@@ -356,7 +366,9 @@ function renderStats(R){
 }
 function payText(p){return p==='full'?'<span class="pay-full">全薪</span>':p==='unpaid'?'<span class="pay-unpaid">無薪</span>':'<span class="pay-subsidy">就保80%(前6月)</span>';}
 function renderTable(R){
-  $('warnBox').innerHTML=R.warn?`<div class="warn">⚠️ ${R.warn}</div>`:'';
+  let wb=(R.warns||[]).map(w=>`<div class="warn">⚠️ ${w}</div>`).join('');
+  if(R.wedCompliant) wb+=`<div class="ok">✓ ${R.wedOK}</div>`;
+  $('warnBox').innerHTML=wb;
   let h='<tr><th>假別</th><th>起</th><th>訖</th><th>天數</th><th>薪資</th></tr>';
   h+=`<tr><td colspan="5" style="color:var(--muted)">— 受孕 ${fmt(R.conception)} → 穩定期正常上班至 <b>${fmt(R.lastWorkDay)}（週${WK[R.lastWorkDay.getDay()]}）</b> —</td></tr>`;
   R.segs.forEach(s=>{
