@@ -152,7 +152,7 @@
       <label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-weight:500;color:var(--ink)">
         <input type="checkbox" id="prenatalSpread" checked> 於穩定期內分次用掉（不影響離場）
       </label>
-      <div class="hint">在受孕～離開前的上班期間平均分次請</div>
+      <div class="hint">⚠️ 法定共 7 天，但你滿穩定期就離開職場，實際只在上班那段請得到 ~2–3 天；7 天為樂觀上限，建議視情況調小</div>
     </div>
   </div>
 
@@ -361,7 +361,7 @@ function renderStats(R){
     <div class="stat"><div class="k">預產期</div><div class="v">${fmtTW(R.edd)}</div><div class="s">${R.edd.getFullYear()}</div></div>
     <div class="stat"><div class="k">復職日</div><div class="v">${fmtTW(R.reInstate)}</div><div class="s">${R.reInstate.getFullYear()}</div></div>
     <div class="stat"><div class="k">連續離場總長</div><div class="v">${total}<span style="font-size:12px"> 天</span></div><div class="s">約 ${(total/30.4).toFixed(1)} 個月</div></div>
-    <div class="stat"><div class="k">全薪 / 無薪</div><div class="v" style="font-size:15px"><span class="pay-full">${fullDays}</span> / <span class="pay-unpaid">${unpaid}</span></div><div class="s">育嬰留停另計就保津貼</div></div>`;
+    <div class="stat"><div class="k">全薪 / 無薪</div><div class="v" style="font-size:15px"><span class="pay-full">${fullDays}</span> / <span class="pay-unpaid">${unpaid}</span></div><div class="s">${R.prenatalSpread&&R.prenatalDays>0?`含產檢假 ${R.prenatalDays} 天（樂觀，實際約 2–3）`:'育嬰留停另計就保津貼'}</div></div>`;
 }
 function payText(p){return p==='full'?'<span class="pay-full">全薪</span>':p==='unpaid'?'<span class="pay-unpaid">無薪</span>':'<span class="pay-subsidy">就保80%(前6月)</span>';}
 function renderTable(R){
